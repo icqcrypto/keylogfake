@@ -1,0 +1,127 @@
+# fake_keylogger_troll.py
+# Güvenli, zararsız "troll" sahte keylogger - gerçek tuşları yakalamaz.
+# Çalıştırınca ekranda "kaydedilen girdiler" gibi gösterir, gerçek veri toplamaz.
+# Python 3.8+ ile çalışır. (Tkinter standart gelir.)
+
+import tkinter as tk
+from tkinter.scrolledtext import ScrolledText
+import threading
+import time
+import random
+import datetime
+
+FAKE_WORDS = [
+    "password", "123456", "qwerty", "admin", "letmein", "hello", "sus", "imposter",
+    "buy now", "secret", "naber", "furkan", "bistencs", "not_to_be_understood"
+]
+
+class FakeKeyloggerApp:
+    def __init__(self, master):
+        self.master = master
+        master.title("KeyLog Viewer (Demo)")
+        master.geometry("700x450")
+        master.resizable(False, False)
+
+        top = tk.Frame(master, pady=8)
+        top.pack(fill="x")
+
+        tk.Label(top, text="Sahte Keylogger - Troll Demo", font=("Segoe UI", 14, "bold")).pack(side="left", padx=10)
+
+        btn_frame = tk.Frame(master, pady=6)
+        btn_frame.pack(fill="x")
+
+        self.start_btn = tk.Button(btn_frame, text="Başlat", width=12, command=self.start)
+        self.start_btn.pack(side="left", padx=8)
+        self.stop_btn = tk.Button(btn_frame, text="Durdur", width=12, command=self.stop, state="disabled")
+        self.stop_btn.pack(side="left", padx=8)
+        self.save_btn = tk.Button(btn_frame, text="Sahte Logu Kaydet", width=16, command=self.save_fake_log)
+        self.save_btn.pack(side="left", padx=8)
+
+        self.notice = tk.Label(btn_frame, text="Not: Bu program GERÇEK TUŞLARI yakalamaz. Tamamen şaka amaçlıdır.", fg="orange")
+        self.notice.pack(side="left", padx=10)
+
+        self.text = ScrolledText(master, font=("Consolas", 11), state="disabled")
+        self.text.pack(fill="both", expand=True, padx=10, pady=(4,10))
+
+        # küçük eğlence: sahte 'aktif' göstergesi
+        self.status = tk.Label(master, text="Durum: Durduruldu", anchor="w")
+        self.status.pack(fill="x", padx=10)
+
+        self._running = False
+        self._thread = None
+        self._fake_lines = []
+
+    def start(self):
+        if self._running:
+            return
+        self._running = True
+        self.start_btn.config(state="disabled")
+        self.stop_btn.config(state="normal")
+        self.status.config(text="Durum: Sahte kaydetme başladı — (gerçek değil)", fg="green")
+        self._thread = threading.Thread(target=self._generate_fake_input, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        if not self._running:
+            return
+        self._running = False
+        self.start_btn.config(state="normal")
+        self.stop_btn.config(state="disabled")
+        self.status.config(text="Durum: Durduruldu", fg="black")
+
+    def _append_text(self, s):
+        self.text.config(state="normal")
+        self.text.insert("end", s + "\n")
+        self.text.see("end")
+        self.text.config(state="disabled")
+
+    def _generate_fake_input(self):
+        # Rastgele, gerçekçi görünen ama uydurma satırlar üretir
+        session_id = random.randint(1000, 9999)
+        header = f"--- Sahte Session #{session_id} başlatıldı: {datetime.datetime.now().isoformat(timespec='seconds')} ---"
+        self._fake_lines.append(header)
+        self.master.after(0, lambda: self._append_text(header))
+
+        actions = ["typed", "pasted", "pressed", "submitted"]
+        while self._running:
+            # bekleme süresi rastgele, sahte kullanıcı "yazma" hissi verir
+            time.sleep(random.uniform(0.6, 2.2))
+
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            word = random.choice(FAKE_WORDS)
+            # bazen biraz karışık karakterler ekle
+            noise = "".join(random.choices("!@#$_-+={}[]<>/?", k=random.randint(0,3)))
+            length = random.randint(3, len(word)+3)
+            fake_input = (word + noise)[:length]
+
+            action = random.choice(actions)
+            fake_line = f"[{timestamp}] {action} -> {fake_input}"
+            self._fake_lines.append(fake_line)
+            self.master.after(0, lambda ln=fake_line: self._append_text(ln))
+
+            # ara sıra "çok satırlı" sahte veri göster
+            if random.random() < 0.12:
+                note = f"[{timestamp}] system note -> Simulated clipboard: " + random.choice(FAKE_WORDS)
+                self._fake_lines.append(note)
+                self.master.after(0, lambda ln=note: self._append_text(ln))
+
+        footer = f"--- Sahte Session #{session_id} durdu: {datetime.datetime.now().isoformat(timespec='seconds')} ---"
+        self._fake_lines.append(footer)
+        self.master.after(0, lambda: self._append_text(footer))
+
+    def save_fake_log(self):
+        if not self._fake_lines:
+            tk.messagebox.showinfo("Kaydet", "Henüz kaydedilecek sahte bir log yok. Önce Başlat'a basın.")
+            return
+        filename = f"fake_keylog_{int(time.time())}.txt"
+        try:
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("\n".join(self._fake_lines))
+            tk.messagebox.showinfo("Kaydetildi", f"Sahte log '{filename}' olarak kaydedildi.")
+        except Exception as e:
+            tk.messagebox.showerror("Hata", f"Kaydederken hata: {e}")
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FakeKeyloggerApp(root)
+    root.mainloop()
